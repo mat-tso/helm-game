@@ -32,15 +32,21 @@ instance Fractional a => Fractional (Vector a) where
 toPair :: Vector a -> (a, a)
 toPair (Vector x y) = (x,y)
 
-fromPair :: (a, a) -> Vector a
-fromPair (x,y) = (Vector x y)
+vector :: (a, a) -> Vector a
+vector (x,y) = (Vector x y)
 
-------
 
+-- | x * (abs x)
+signedSquare :: (Floating a) => a -> a
+signedSquare = (*) <*> abs
+
+-- | (x / abs x) * sqrt (abs x)
 absSqrt :: (Floating a, Ord a) => a -> a
 absSqrt a
     | a >= 0 = sqrt a
     | otherwise = negate.sqrt $ negate a
+
+-----
 
 data MassState = MassState {
     mass :: Double,
@@ -57,12 +63,14 @@ accelerate force t (MassState m p s) = MassState m p' s'
 dragCoef :: Vector Double
 dragCoef = Vector (-1) (-0.6)
 
+
+
 step :: (Time, (Int, Int)) -> MassState -> MassState
-step (dt, (ax, ay)) state = accelerate force dt state
-    where push = Vector (fromIntegral ax) (fromIntegral ay)
+step (dt, acc) state = accelerate force dt state
+    where push = fmap fromIntegral $ vector acc
           --drag = dragCoef * (fmap absSqrt $ speed state)
           --drag = dragCoef * (speed state)
-          drag = dragCoef * (fmap ((*)<*>abs) $ speed state)
+          drag = dragCoef * (fmap signedSquare $ speed state)
           force = push + drag
 
 chipForm :: Form
@@ -74,8 +82,7 @@ render (w, h) state =
 
 input :: SignalGen (Signal (Time, (Int, Int)))
 input = (,) <~ delta' ~~ Keyboard.arrows
-  where
-    delta' = delay $ fps 60
+  where delta' = delay $ fps 60
 
 main :: IO ()
 main = run defaultConfig $ render <~ Window.dimensions ~~ stepper
